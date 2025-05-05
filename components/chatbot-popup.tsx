@@ -22,12 +22,14 @@ type Program = {
   name: string
   description: string
   url: string
+  supervisors: string[]
 }
 
 type Supervisor = {
   name: string
-  department: string
-  research: string
+  university: string
+  field: string
+  description: string
   url: string
 }
 
@@ -40,12 +42,12 @@ export function ChatbotPopup({ isOpen, onClose }: ChatbotPopupProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "system",
-      content: "You are a helpful assistant for Cambridge Physics postgraduate admissions.",
+      content: "You are Cav, an AI assistant who helps students choose the right Physics programme at the University of Cambridge.",
     },
     {
       role: "assistant",
       content:
-        "👋 Hello! I'm your Cambridge Physics postgraduate advisor. I can help you find suitable programs and supervisors based on your background and interests.\n\nTo get started, could you tell me about the physics courses you completed during your undergraduate studies?",
+        "Hi I am Cav, your AI assistant who is here to help you with choosing the right Physics programme. Can you tell me more about your research interests?",
     },
   ])
   const [input, setInput] = useState("")
@@ -94,93 +96,83 @@ export function ChatbotPopup({ isOpen, onClose }: ChatbotPopupProps) {
     setIsLoading(true)
 
     try {
-      // In a real implementation, we would use the AI SDK to generate a response
-      // For demo purposes, we'll simulate the AI response
+      // Get all messages except the system message for the API call
+      const messageHistory = messages
+        .filter(m => m.role !== "system")
+        .concat(userMessage)
 
-      const userMessages = [...messages, userMessage]
-        .filter((m) => m.role !== "system")
-        .map((m) => m.content)
-        .join("\n")
-
-      // Check if this is the second user message (after background, asking for interests)
-      const isSecondUserMessage = messages.filter((m) => m.role === "user").length === 1
-
-      let aiResponse: string
-
-      if (isSecondUserMessage) {
-        aiResponse =
-          "Thank you for sharing your background. Now, could you tell me about your research interests in physics? For example, are you interested in quantum physics, astrophysics, condensed matter, etc.?"
-      } else if (messages.filter((m) => m.role === "user").length === 2) {
-        // This is the third interaction, after getting background and interests
-        aiResponse =
-          "Thank you for providing your information. Based on your background and interests, I've found some potential matches for you. Please see the recommendations below."
-
-        // Generate mock results
-        setResults({
-          programs: [
-            {
-              name: "MASt in Physics",
-              description:
-                "A one-year taught master's course aimed at those who wish to pursue research in physics but require additional training to reach the level of the Cambridge PhD.",
-              url: "https://www.phy.cam.ac.uk/study/postgraduate/mast-physics",
-            },
-            {
-              name: "PhD in Physics",
-              description:
-                "Research-based doctoral program covering various fields including quantum physics, condensed matter, and theoretical physics.",
-              url: "https://www.phy.cam.ac.uk/study/postgraduate/phd-physics",
-            },
-            {
-              name: "MPhil in Scientific Computing",
-              description:
-                "One-year research master's program focusing on computational methods in physics and other scientific disciplines.",
-              url: "https://www.phy.cam.ac.uk/study/postgraduate/mphil-scientific-computing",
-            },
-          ],
-          supervisors: [
-            {
-              name: "Professor Didier Queloz",
-              department: "Cavendish Laboratory",
-              research: "Exoplanets and astrophysics, Nobel Prize winner for discovery of exoplanets.",
-              url: "https://www.phy.cam.ac.uk/people/queloz",
-            },
-            {
-              name: "Professor Richard Friend",
-              department: "Cavendish Laboratory",
-              research: "Condensed matter physics, organic semiconductors and optoelectronic devices.",
-              url: "https://www.phy.cam.ac.uk/people/friend",
-            },
-            {
-              name: "Dr. Suchitra Sebastian",
-              department: "Cavendish Laboratory",
-              research:
-                "Quantum materials, strongly correlated electron systems, and high-temperature superconductivity.",
-              url: "https://www.phy.cam.ac.uk/people/sebastian",
-            },
-          ],
+      // Add a special instruction for the second user message
+      const userMessageCount = messageHistory.filter(m => m.role === "user").length
+      if (userMessageCount === 2) {
+        messageHistory.push({
+          role: "system",
+          content: `Please provide recommendations based on the courses and interests shared. Format your response as JSON with the following structure:
+          {
+            "programs": [
+              {
+                "name": "Program Name",
+                "description": "Why this program is a good fit",
+                "url": "Program URL",
+                "supervisors": ["Supervisor 1", "Supervisor 2"]
+              }
+            ],
+            "supervisors": [
+              {
+                "name": "Supervisor Name",
+                "university": "University of Cambridge",
+                "field": "Research Field",
+                "description": "Research description",
+                "url": "Supervisor profile URL"
+              }
+            ]
+          }`
         })
-
-        setShowResults(true)
-      } else {
-        aiResponse =
-          "Is there anything specific about these recommendations you'd like to know more about? Or would you like to explore different research areas?"
       }
 
-      // In a real implementation, we would use the AI SDK like this:
-      // const { text: aiResponse } = await generateText({
-      //   model: openai("gpt-4o"),
-      //   prompt: userMessages,
-      //   system: "You are a helpful assistant for Cambridge Physics postgraduate admissions. Provide concise, helpful responses."
-      // })
+      // Make API call
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messages: messageHistory
+        }),
+      })
 
-      setMessages((prev) => [...prev, { role: "assistant", content: aiResponse }])
+      if (!response.ok) {
+        throw new Error("Failed to get response")
+      }
+
+      const data = await response.json()
+
+      // Handle both regular messages and recommendations
+      if (data.programs && data.supervisors) {
+        setResults(data)
+        setShowResults(true)
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: "Thank you for providing your information. Based on your background and interests, I've found some potential matches for you. Please see the recommendations below."
+          }
+        ])
+      } else if (data.message) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: data.message
+          }
+        ])
+      }
     } catch (error) {
       console.error("Error generating response:", error)
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: "I'm sorry, I encountered an error. Please try again.",
+          content: "I'm sorry, I encountered an error while processing your request. Please try again.",
         },
       ])
     } finally {
@@ -270,7 +262,17 @@ export function ChatbotPopup({ isOpen, onClose }: ChatbotPopupProps) {
 
         {/* Results Section */}
         {showResults && results && (
-          <div className="border-t border-[#a0e9dd] p-4 bg-white">
+          <div className="border-t border-[#a0e9dd] p-4 bg-white overflow-y-auto max-h-[60vh]">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-[#033744]">Recommendations</h3>
+              <Button
+                variant="ghost"
+                onClick={() => setShowResults(false)}
+                className="text-[#033744] hover:bg-[#37b3a6] hover:text-white"
+              >
+                Back to Chat
+              </Button>
+            </div>
             <Tabs defaultValue="programs">
               <TabsList className="grid w-full grid-cols-2 mb-4">
                 <TabsTrigger value="programs">Programs</TabsTrigger>
@@ -302,8 +304,9 @@ export function ChatbotPopup({ isOpen, onClose }: ChatbotPopupProps) {
                   <Card key={index} className="overflow-hidden">
                     <CardContent className="p-4">
                       <h3 className="font-semibold text-[#033744] mb-1">{supervisor.name}</h3>
-                      <p className="text-xs text-gray-500 mb-1">{supervisor.department}</p>
-                      <p className="text-sm text-gray-600 mb-2">{supervisor.research}</p>
+                      <p className="text-xs text-gray-500 mb-1">{supervisor.university}</p>
+                      <p className="text-sm text-gray-600 mb-2">{supervisor.field}</p>
+                      <p className="text-sm text-gray-600 mb-2">{supervisor.description}</p>
                       <a
                         href={supervisor.url}
                         target="_blank"
