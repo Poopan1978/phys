@@ -22,14 +22,12 @@ type Program = {
   name: string
   description: string
   url: string
-  supervisors: string[]
 }
 
 type Supervisor = {
   name: string
-  university: string
-  field: string
-  description: string
+  department: string
+  research: string
   url: string
 }
 
@@ -47,7 +45,7 @@ export function ChatbotPopup({ isOpen, onClose }: ChatbotPopupProps) {
     {
       role: "assistant",
       content:
-        "Hi I am Cav, your AI assistant who is here to help you with choosing the right Physics programme. Can you tell me more about your research interests?",
+        "👋 Hello! I'm your Cambridge Physics postgraduate advisor. I can help you find suitable programs and supervisors based on your background and interests.\n\nTo get started, could you tell me about the physics courses you completed during your undergraduate studies?",
     },
   ])
   const [input, setInput] = useState("")
@@ -100,34 +98,6 @@ export function ChatbotPopup({ isOpen, onClose }: ChatbotPopupProps) {
       const messageHistory = messages
         .filter(m => m.role !== "system")
         .concat(userMessage)
-
-      // Add a special instruction for the second user message
-      const userMessageCount = messageHistory.filter(m => m.role === "user").length
-      if (userMessageCount === 2) {
-        messageHistory.push({
-          role: "system",
-          content: `Please provide recommendations based on the courses and interests shared. Format your response as JSON with the following structure:
-          {
-            "programs": [
-              {
-                "name": "Program Name",
-                "description": "Why this program is a good fit",
-                "url": "Program URL",
-                "supervisors": ["Supervisor 1", "Supervisor 2"]
-              }
-            ],
-            "supervisors": [
-              {
-                "name": "Supervisor Name",
-                "university": "University of Cambridge",
-                "field": "Research Field",
-                "description": "Research description",
-                "url": "Supervisor profile URL"
-              }
-            ]
-          }`
-        })
-      }
 
       // Make API call
       const response = await fetch("/api/chat", {
@@ -304,9 +274,8 @@ export function ChatbotPopup({ isOpen, onClose }: ChatbotPopupProps) {
                   <Card key={index} className="overflow-hidden">
                     <CardContent className="p-4">
                       <h3 className="font-semibold text-[#033744] mb-1">{supervisor.name}</h3>
-                      <p className="text-xs text-gray-500 mb-1">{supervisor.university}</p>
-                      <p className="text-sm text-gray-600 mb-2">{supervisor.field}</p>
-                      <p className="text-sm text-gray-600 mb-2">{supervisor.description}</p>
+                      <p className="text-xs text-gray-500 mb-1">{supervisor.department}</p>
+                      <p className="text-sm text-gray-600 mb-2">{supervisor.research}</p>
                       <a
                         href={supervisor.url}
                         target="_blank"
